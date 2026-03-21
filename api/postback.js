@@ -43,7 +43,7 @@ export default async function handler(req, res) {
             break;
             
         case 'rebill':
-            header = `🔔 <b>ПРОФИТ</b> (UID: ${transaction_id})`;
+            header = `💸 <b>ПРОФИТ</b> (UID: ${transaction_id})`;
             paymentInfo = `\nПолучено: ${payout} ${currency}`;
             break;
             
