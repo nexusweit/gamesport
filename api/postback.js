@@ -1,5 +1,7 @@
 export default async function handler(req, res) {
-    // Получаем данные из URL (GET-запрос от партнерки)
+    // Поддержка GET и POST
+    const data = req.method === 'POST' ? req.body : req.query;
+
     const { 
         status, 
         transaction_id, 
@@ -7,7 +9,7 @@ export default async function handler(req, res) {
         payout, 
         payout_total, 
         payout_currency 
-    } = req.query;
+    } = data;
 
     const BOT_TOKEN = process.env.BOT_TOKEN;
     const CHAT_ID = process.env.CHAT_ID;
@@ -16,77 +18,81 @@ export default async function handler(req, res) {
         return res.status(500).send('Config error');
     }
 
-    // Переменные для сборки сообщения
-    let header = '';
-    let paymentInfo = '';
-    
-    // Подстраховка: если валюта не пришла, ставим ₽
-    const currency = payout_currency || '₽';
+    // --- Обработка валюты ---
+    // Если пусто, по умолчанию ставим rub. Переводим в нижний регистр для проверки.
+    let rawCurrency = (payout_currency || 'rub').toLowerCase();
+    // Заменяем rub на ₽, остальные валюты делаем заглавными (например, usd -> USD)
+    let currency = rawCurrency === 'rub' ? '₽' : rawCurrency.toUpperCase();
 
-    // Формируем заголовок и инфу о выплате в зависимости от статуса
+    // --- Переменные для сборки сообщения ---
+    let header = '';
+    let paymentLine = ''; // Дополнительная строка, если есть оплата
+
+    // --- Настройка английских заголовков под каждый статус ---
     switch (status) {
         case 'registration':
-            header = `👤 <b>Регистрация</b> (UID: ${transaction_id})`;
+            header = '👤 <b>New Registration</b>';
             break;
             
         case 'first_buy':
-            header = `🔥 <b>(first_buy) Активация</b> (UID: ${transaction_id})`;
-            paymentInfo = `\nПолучено: ${payout} ${currency}`;
+            header = '🔥 <b>First Purchase</b>';
+            paymentLine = `├Received: <b>${payout} ${currency}</b>\n`;
             break;
             
         case 'subscribe':
-            header = `✅ <b>Новая подписка</b> № ${transaction_id}`;
+            header = '✅ <b>New Subscription</b>';
             break;
             
         case 'unsubscribe':
-            header = `❌ <b>Отписка</b> № ${transaction_id}`;
+            header = '❌ <b>Unsubscribed</b>';
             break;
             
         case 'rebill':
-            header = `💸 <b>Партнерское вознаграждение</b> (UID: ${transaction_id})`;
-            paymentInfo = `\nПолучено: ${payout} ${currency}`;
+            header = '💸 <b>Successfully paid</b>';
+            paymentLine = `├Received: <b>${payout} ${currency}</b>\n`;
             break;
             
         case 'chargeback':
-            header = `🔴 <b>Чарджбек</b> (UID: ${transaction_id})`;
-            paymentInfo = `\nУдержано: ${payout} ${currency}`;
+            header = '🔴 <b>Chargeback</b>';
+            paymentLine = `├Lost: <b>${payout} ${currency}</b>\n`;
             break;
             
         case 'refund':
-            header = `🟡 <b>Возврат</b> (UID: ${transaction_id})`;
-            paymentInfo = `\nВозвращено: ${payout} ${currency}`;
+            header = '🟡 <b>Refunded</b>';
+            paymentLine = `├Returned: <b>${payout} ${currency}</b>\n`;
             break;
             
         default:
-            // Если придет какой-то неизвестный статус
-            header = `⚠️ <b>Неизвестное событие: ${status}</b> (UID: ${transaction_id})`;
+            header = `⚠️ <b>Unknown Event (${status})</b>`;
             if (payout && payout !== '0') {
-                paymentInfo = `\nСумма: ${payout} ${currency}`;
+                paymentLine = `├Amount: <b>${payout} ${currency}</b>\n`;
             }
     }
 
-    // Собираем итоговое сообщение
-    const message = `${header}${paymentInfo}
-Поток: ${stream || 'Не указан'}
+    // --- Сборка итогового сообщения ---
+    // ВАЖНО: переносы строк здесь влияют на то, как текст выглядит в ТГ
+    const message = `${header}
+Details:
+├User: <b>${transaction_id || 'Unknown'}</b>
+${paymentLine}╰Stream: <b>${stream || 'None'}</b>
 
-Общая сводка по юзеру: ${payout_total || '0'} ${currency}`;
+General summary: <b>${payout_total || '0'} ${currency}</b>`;
 
+    // --- Отправка в Телеграм ---
     try {
-        // Отправка в Телеграм
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: CHAT_ID,
                 text: message,
-                parse_mode: 'HTML' // Разрешает использовать <b> для жирного шрифта
+                parse_mode: 'HTML'
             })
         });
 
-        // Отвечаем партнерке, что всё успешно принято
         res.status(200).send('OK');
     } catch (error) {
-        console.error('Ошибка:', error);
+        console.error('Ошибка отправки:', error);
         res.status(500).send('Error');
     }
 }
