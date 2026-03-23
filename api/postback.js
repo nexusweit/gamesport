@@ -19,61 +19,68 @@ export default async function handler(req, res) {
     }
 
     // --- Обработка валюты ---
-    // Если пусто, по умолчанию ставим rub. Переводим в нижний регистр для проверки.
     let rawCurrency = (payout_currency || 'rub').toLowerCase();
-    // Заменяем rub на ₽, остальные валюты делаем заглавными (например, usd -> USD)
     let currency = rawCurrency === 'rub' ? '₽' : rawCurrency.toUpperCase();
 
     // --- Переменные для сборки сообщения ---
     let header = '';
-    let paymentLine = ''; // Дополнительная строка, если есть оплата
+    let paymentLine = ''; 
+    let idLabel = 'User'; // По умолчанию пишем User
 
     // --- Настройка английских заголовков под каждый статус ---
     switch (status) {
         case 'registration':
             header = '👤 <b>New Registration</b>';
+            idLabel = 'User'; // Здесь логично оставить User
             break;
             
         case 'first_buy':
             header = '🔥 <b>First Purchase</b>';
             paymentLine = `├Received: <b>${payout} ${currency}</b>\n`;
+            idLabel = 'ID'; // Меняем на ID
             break;
             
         case 'subscribe':
             header = '✅ <b>New Subscription</b>';
+            idLabel = 'ID'; // При новой подписке тоже логично писать ID подписки
             break;
             
         case 'unsubscribe':
             header = '❌ <b>Unsubscribed</b>';
+            idLabel = 'ID'; // Меняем на ID
             break;
             
         case 'rebill':
             header = '💸 <b>Successfully paid</b>';
             paymentLine = `├Received: <b>${payout} ${currency}</b>\n`;
+            idLabel = 'User'; // При ребилле оставляем User (по твоему примеру)
             break;
             
         case 'chargeback':
             header = '🔴 <b>Chargeback</b>';
             paymentLine = `├Lost: <b>${payout} ${currency}</b>\n`;
+            idLabel = 'User';
             break;
             
         case 'refund':
             header = '🟡 <b>Refunded</b>';
             paymentLine = `├Returned: <b>${payout} ${currency}</b>\n`;
+            idLabel = 'User';
             break;
             
         default:
             header = `⚠️ <b>Unknown Event (${status})</b>`;
+            idLabel = 'ID';
             if (payout && payout !== '0') {
                 paymentLine = `├Amount: <b>${payout} ${currency}</b>\n`;
             }
     }
 
     // --- Сборка итогового сообщения ---
-    // ВАЖНО: переносы строк здесь влияют на то, как текст выглядит в ТГ
+    // Переменная idLabel подставится автоматически в зависимости от статуса
     const message = `${header}
 Details:
-├User: <b>${transaction_id || 'Unknown'}</b>
+├${idLabel}: <b>${transaction_id || 'Unknown'}</b>
 ${paymentLine}╰Stream: <b>${stream || 'None'}</b>
 
 General summary: <b>${payout_total || '0'} ${currency}</b>`;
