@@ -22,8 +22,9 @@ export default async function handler(req, res) {
     let rawCurrency = (payout_currency || 'rub').toLowerCase();
     let currency = rawCurrency === 'rub' ? '₽' : rawCurrency.toUpperCase();
 
-    // Переменная для итогового сообщения
+    // Переменные для сообщения и кнопок
     let message = '';
+    let reply_markup = undefined; // Переменная для хранения кнопок
 
     // --- Настройка текстов под каждый статус ---
     switch (status) {
@@ -32,11 +33,24 @@ export default async function handler(req, res) {
 `<tg-emoji emoji-id="5999276388534719489">💚</tg-emoji> <b>New reg</b>\n
 <tg-emoji emoji-id="5251307370079862951">👱‍♀️</tg-emoji> User ID: <b>${transaction_id || 'Unknown'}</b>
 <tg-emoji emoji-id="5251508172685853796">✈️</tg-emoji> Stream: <b>${stream || 'None'}</b>`;
+            
+            // Добавляем кнопку только если есть transaction_id
+            if (transaction_id) {
+                reply_markup = {
+                    inline_keyboard: [
+                        [
+                            {
+                                text: "🏕 View", // Обычный эмодзи, так как в кнопках не работает <tg-emoji>
+                                url: `https://gamesport.partners/cabinet/users/${transaction_id}`
+                            }
+                        ]
+                    ]
+                };
+            }
             break;
             
         case 'first_buy':
         case 'subscribe':
-            // Активация (первая покупка или подписка)
             message = 
 `<tg-emoji emoji-id="5251577880005068514">✅</tg-emoji> <b>Purchase</b>\n
 <tg-emoji emoji-id="5251755597161842024">✈️</tg-emoji> ID: <b>${transaction_id || 'Unknown'}</b>
@@ -44,7 +58,6 @@ export default async function handler(req, res) {
             break;
             
         case 'rebill':
-            // Успешная оплата (ребилл)
             message = 
 `<tg-emoji emoji-id="5251348640420623380">💵</tg-emoji> <b>Successfully paid</b>\n
 <tg-emoji emoji-id="5251492916962018172">💳</tg-emoji> ID: <b>${transaction_id || 'Unknown'}</b>
@@ -54,7 +67,6 @@ export default async function handler(req, res) {
             break;
 
         case 'unsubscribe':
-            // Отписка
             message = 
 `<tg-emoji emoji-id="5271934564699226262">❌</tg-emoji> <b>Отписка</b>\n
 <tg-emoji emoji-id="5251307370079862951">👱‍♀️</tg-emoji> User ID: <b>${transaction_id || 'Unknown'}</b>
@@ -86,16 +98,24 @@ ${payout && payout !== '0' ? `💰 Amount: <b>${payout} ${currency}</b>\n` : ''}
             break;
     }
 
+    // Формируем payload (тело запроса)
+    const payload = {
+        chat_id: CHAT_ID,
+        text: message,
+        parse_mode: 'HTML'
+    };
+
+    // Если для статуса была создана клавиатура, добавляем её в запрос
+    if (reply_markup) {
+        payload.reply_markup = reply_markup;
+    }
+
     // --- Отправка в Телеграм ---
     try {
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: CHAT_ID,
-                text: message,
-                parse_mode: 'HTML' // Обязательно HTML для работы <tg-emoji>
-            })
+            body: JSON.stringify(payload)
         });
 
         res.status(200).send('OK');
