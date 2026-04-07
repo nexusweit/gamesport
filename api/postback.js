@@ -24,7 +24,7 @@ export default async function handler(req, res) {
 
     // Переменные для сообщения и кнопок
     let message = '';
-    let reply_markup = undefined; // Переменная для хранения кнопок
+    let reply_markup = undefined;
 
     // --- Настройка текстов под каждый статус ---
     switch (status) {
@@ -34,14 +34,16 @@ export default async function handler(req, res) {
 <tg-emoji emoji-id="5251307370079862951">👱‍♀️</tg-emoji> User ID: <b>${transaction_id || 'Unknown'}</b>
 <tg-emoji emoji-id="5251508172685853796">✈️</tg-emoji> Stream: <b>${stream || 'None'}</b>`;
             
-            // Добавляем кнопку только если есть transaction_id
+            // Добавляем цветную кнопку с кастомным эмодзи
             if (transaction_id) {
                 reply_markup = {
                     inline_keyboard: [
                         [
                             {
-                                text: "🏕 View", // Обычный эмодзи, так как в кнопках не работает <tg-emoji>
-                                url: `https://gamesport.partners/cabinet/users/${transaction_id}`
+                                text: "View", // Текст кнопки
+                                url: `https://gamesport.partners/cabinet/users/${transaction_id}`,
+                                icon_custom_emoji_id: "5251736458787572173", // Премиум эмодзи
+                                style: "success" // Зеленый цвет кнопки согласно документации
                             }
                         ]
                     ]
@@ -98,14 +100,14 @@ ${payout && payout !== '0' ? `💰 Amount: <b>${payout} ${currency}</b>\n` : ''}
             break;
     }
 
-    // Формируем payload (тело запроса)
+    // Формируем тело запроса
     const payload = {
         chat_id: CHAT_ID,
         text: message,
         parse_mode: 'HTML'
     };
 
-    // Если для статуса была создана клавиатура, добавляем её в запрос
+    // Прикрепляем клавиатуру, если она есть
     if (reply_markup) {
         payload.reply_markup = reply_markup;
     }
