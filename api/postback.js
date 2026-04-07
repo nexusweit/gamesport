@@ -22,68 +22,69 @@ export default async function handler(req, res) {
     let rawCurrency = (payout_currency || 'rub').toLowerCase();
     let currency = rawCurrency === 'rub' ? '₽' : rawCurrency.toUpperCase();
 
-    // --- Переменные для сборки сообщения ---
-    let header = '';
-    let paymentLine = ''; 
-    let idLabel = 'User'; // По умолчанию пишем User
+    // Переменная для итогового сообщения
+    let message = '';
 
-    // --- Настройка английских заголовков под каждый статус ---
+    // --- Настройка текстов под каждый статус ---
     switch (status) {
         case 'registration':
-            header = '👤 <b>New Registration</b>';
-            idLabel = 'User'; // Здесь логично оставить User
+            message = 
+`<tg-emoji emoji-id="5251540724242990290">✅</tg-emoji> <b>New reg</b>\n
+<tg-emoji emoji-id="5251307370079862951">👱‍♀️</tg-emoji> User ID: <b>${transaction_id || 'Unknown'}</b>
+<tg-emoji emoji-id="5251508172685853796">✈️</tg-emoji> Stream: <b>${stream || 'None'}</b>`;
             break;
             
         case 'first_buy':
-            header = '🔥 <b>First Purchase</b>';
-            paymentLine = `├Received: <b>${payout} ${currency}</b>\n`;
-            idLabel = 'ID'; // Меняем на ID
-            break;
-            
         case 'subscribe':
-            header = '✅ <b>New Subscription</b>';
-            idLabel = 'ID'; // При новой подписке тоже логично писать ID подписки
-            break;
-            
-        case 'unsubscribe':
-            header = '❌ <b>Unsubscribed</b>';
-            idLabel = 'ID'; // Меняем на ID
+            // Активация (первая покупка или подписка)
+            message = 
+`<tg-emoji emoji-id="5251577880005068514">✅</tg-emoji> <b>Purchase</b>\n
+<tg-emoji emoji-id="5251755597161842024">✈️</tg-emoji> ID: <b>${transaction_id || 'Unknown'}</b>
+<tg-emoji emoji-id="5251508172685853796">✈️</tg-emoji> Stream: <b>${stream || 'None'}</b>`;
             break;
             
         case 'rebill':
-            header = '💸 <b>Successfully paid</b>';
-            paymentLine = `├Received: <b>${payout} ${currency}</b>\n`;
-            idLabel = 'User'; // При ребилле оставляем User (по твоему примеру)
+            // Успешная оплата (ребилл)
+            message = 
+`<tg-emoji emoji-id="5251348640420623380">💵</tg-emoji> <b>Successfully paid</b>\n
+<tg-emoji emoji-id="5251492916962018172">💳</tg-emoji> ID: <b>${transaction_id || 'Unknown'}</b>
+<tg-emoji emoji-id="5253681344533249693">💵</tg-emoji> Received: <b>${payout || '0'} ${currency}</b>
+<tg-emoji emoji-id="5251508172685853796">✈️</tg-emoji> Stream: <b>${stream || 'None'}</b>\n
+<tg-emoji emoji-id="5251480109369542639">💰</tg-emoji> General summary: <b>${payout_total || '0'} ${currency}</b>`;
+            break;
+
+        case 'unsubscribe':
+            // Отписка
+            message = 
+`<tg-emoji emoji-id="5271934564699226262">❌</tg-emoji> <b>Отписка</b>\n
+<tg-emoji emoji-id="5251307370079862951">👱‍♀️</tg-emoji> User ID: <b>${transaction_id || 'Unknown'}</b>
+<tg-emoji emoji-id="5251508172685853796">✈️</tg-emoji> Stream: <b>${stream || 'None'}</b>\n
+<tg-emoji emoji-id="5377620300965888937">🔴</tg-emoji> Всего получено с юзера: <b>${payout_total || '0'} ${currency}</b>`;
             break;
             
         case 'chargeback':
-            header = '🔴 <b>Chargeback</b>';
-            paymentLine = `├Lost: <b>${payout} ${currency}</b>\n`;
-            idLabel = 'User';
+            message = 
+`🔴 <b>Chargeback</b>\n
+👤 User: <b>${transaction_id || 'Unknown'}</b>
+📉 Lost: <b>${payout || '0'} ${currency}</b>
+✈️ Stream: <b>${stream || 'None'}</b>`;
             break;
             
         case 'refund':
-            header = '🟡 <b>Refunded</b>';
-            paymentLine = `├Returned: <b>${payout} ${currency}</b>\n`;
-            idLabel = 'User';
+            message = 
+`🟡 <b>Refunded</b>\n
+👤 User: <b>${transaction_id || 'Unknown'}</b>
+↩️ Returned: <b>${payout || '0'} ${currency}</b>
+✈️ Stream: <b>${stream || 'None'}</b>`;
             break;
             
         default:
-            header = `⚠️ <b>Unknown Event (${status})</b>`;
-            idLabel = 'ID';
-            if (payout && payout !== '0') {
-                paymentLine = `├Amount: <b>${payout} ${currency}</b>\n`;
-            }
+            message = 
+`⚠️ <b>Unknown Event (${status})</b>\n
+🆔 ID: <b>${transaction_id || 'Unknown'}</b>
+${payout && payout !== '0' ? `💰 Amount: <b>${payout} ${currency}</b>\n` : ''}✈️ Stream: <b>${stream || 'None'}</b>`;
+            break;
     }
-
-    // --- Сборка итогового сообщения ---
-    // Переменная idLabel подставится автоматически в зависимости от статуса
-    const message = `${header}
-Details:
-├${idLabel}: <b>${transaction_id || 'Unknown'}</b>
-${paymentLine}╰Stream: <b>${stream || 'None'}</b>
-
-General summary: <b>${payout_total || '0'} ${currency}</b>`;
 
     // --- Отправка в Телеграм ---
     try {
@@ -93,7 +94,7 @@ General summary: <b>${payout_total || '0'} ${currency}</b>`;
             body: JSON.stringify({
                 chat_id: CHAT_ID,
                 text: message,
-                parse_mode: 'HTML'
+                parse_mode: 'HTML' // Обязательно HTML для работы <tg-emoji>
             })
         });
 
