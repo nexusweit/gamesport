@@ -22,15 +22,13 @@ export default async function handler(req, res) {
     let rawCurrency = (payout_currency || 'rub').toLowerCase();
     let currency = rawCurrency === 'rub' ? '₽' : rawCurrency.toUpperCase();
 
-    // Переменные для сообщения, кнопок и фото
+    // Переменные для сообщения и кнопок
     let message = '';
     let reply_markup = undefined;
-    let photoUrl = undefined; // Переменная для хранения URL картинки
 
-    // --- Настройка текстов, кнопок и фото под каждый статус ---
+    // --- Настройка текстов под каждый статус ---
     switch (status) {
         case 'registration':
-            photoUrl = 'https://i.postimg.cc/NGpT24qb/image.png'; // Фото для регистрации
             message = 
 `<tg-emoji emoji-id="5999276388534719489">💚</tg-emoji> <b>New reg</b>\n
 <tg-emoji emoji-id="5251307370079862951">👱‍♀️</tg-emoji> User ID: <b>${transaction_id || 'Unknown'}</b>
@@ -42,10 +40,10 @@ export default async function handler(req, res) {
                     inline_keyboard: [
                         [
                             {
-                                text: "View", 
+                                text: "View", // Текст кнопки
                                 url: `https://gamesport.partners/cabinet/users/${transaction_id}`,
-                                icon_custom_emoji_id: "5251736458787572173",
-                                style: "success"
+                                icon_custom_emoji_id: "5251736458787572173", // Премиум эмодзи
+                                style: "success" // Зеленый цвет кнопки согласно документации
                             }
                         ]
                     ]
@@ -55,7 +53,6 @@ export default async function handler(req, res) {
             
         case 'first_buy':
         case 'subscribe':
-            photoUrl = 'https://i.postimg.cc/DZ5gZ3P4/image.png'; // Фото для активации
             message = 
 `<tg-emoji emoji-id="5251577880005068514">✅</tg-emoji> <b>Purchase</b>\n
 <tg-emoji emoji-id="5251755597161842024">✈️</tg-emoji> ID: <b>${transaction_id || 'Unknown'}</b>
@@ -63,7 +60,6 @@ export default async function handler(req, res) {
             break;
             
         case 'rebill':
-            photoUrl = 'https://i.postimg.cc/SNcrPPnP/Tom-and-Jerry-Money-Wallpaper-Pc.jpg'; // Фото для оплаты
             message = 
 `<tg-emoji emoji-id="5251348640420623380">💵</tg-emoji> <b>Successfully paid</b>\n
 <tg-emoji emoji-id="5251492916962018172">💳</tg-emoji> ID: <b>${transaction_id || 'Unknown'}</b>
@@ -104,22 +100,12 @@ ${payout && payout !== '0' ? `💰 Amount: <b>${payout} ${currency}</b>\n` : ''}
             break;
     }
 
-    // --- Формируем тело запроса ---
+    // Формируем тело запроса
     const payload = {
         chat_id: CHAT_ID,
+        text: message,
         parse_mode: 'HTML'
     };
-
-    // Определяем метод (отправка фото или обычного текста)
-    let apiMethod = 'sendMessage';
-
-    if (photoUrl) {
-        apiMethod = 'sendPhoto';
-        payload.photo = photoUrl; // Передаем ссылку на фото
-        payload.caption = message; // Текст становится "подписью" к фото
-    } else {
-        payload.text = message; // Если фото нет, отправляем как обычный текст
-    }
 
     // Прикрепляем клавиатуру, если она есть
     if (reply_markup) {
@@ -128,7 +114,7 @@ ${payout && payout !== '0' ? `💰 Amount: <b>${payout} ${currency}</b>\n` : ''}
 
     // --- Отправка в Телеграм ---
     try {
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${apiMethod}`, {
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
