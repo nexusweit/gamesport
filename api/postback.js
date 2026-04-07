@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     switch (status) {
         case 'registration':
             message = 
-`<tg-emoji emoji-id="5251540724242990290">✅</tg-emoji> <b>New reg</b>\n
+`<tg-emoji emoji-id="5999276388534719489">💚</tg-emoji> <b>New reg</b>\n
 <tg-emoji emoji-id="5251307370079862951">👱‍♀️</tg-emoji> User ID: <b>${transaction_id || 'Unknown'}</b>
 <tg-emoji emoji-id="5251508172685853796">✈️</tg-emoji> Stream: <b>${stream || 'None'}</b>`;
             break;
